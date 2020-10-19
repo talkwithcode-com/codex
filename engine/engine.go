@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 
 	"github.com/talkwithcode-com/codex/lib"
 	"github.com/talkwithcode-com/codex/lib/lang"
@@ -25,14 +26,55 @@ func New(tempDir, filename string) *Engine {
 		tempDir:  tempDir,
 		filename: filename,
 		fm:       new(FileManger),
+		exec:     new(Exec),
 	}
 }
 
 // Run code and return the outputs.
-func (e *Engine) Run(ctx context.Context, code *lib.Code, input []byte) (lib.Output, error) {
+func (e *Engine) Run(ctx context.Context, code *lib.Code, input []byte) (*lib.Output, error) {
+	config := lang.LanguageConfig[code.Language]
+	cmdArgs := append(config.Commands, code.Path)
 
-	output := lib.Output{}
-	return output, nil
+	cmd := e.exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
+
+	if input != nil && len(input) > 0 {
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			return nil, err
+		}
+
+		go func() {
+			defer stdin.Close()
+			io.WriteString(stdin, string(input))
+		}()
+	}
+
+	stderr, err := cmd.StderrPipe()
+
+	if err != nil {
+		return nil, err
+	}
+
+	stderrBytes := make(chan []byte)
+
+	go func() {
+		defer stderr.Close()
+		b, _ := ioutil.ReadAll(stderr)
+		stderrBytes <- b
+	}()
+
+	output, err := cmd.Output()
+
+	if err != nil {
+		return nil, err
+	}
+
+	result := &lib.Output{
+		Stderr: string(<-stderrBytes),
+		Stdout: string(output),
+	}
+
+	return result, nil
 }
 
 // WriteCode into file system.
