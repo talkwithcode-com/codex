@@ -103,5 +103,5 @@ func (e *Engine) WriteCode(language lang.Language, sourceCode string) (*lib.Code
 
 // DeleteCode from file system.
 func (e *Engine) DeleteCode(code *lib.Code) {
-
+	e.fm.Remove(code.Path)
 }

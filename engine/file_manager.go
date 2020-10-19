@@ -12,5 +12,5 @@ func (fm FileManger) Create(name string) (*os.File, error) {
 
 // Remove ...
 func (fm FileManger) Remove(path string) error {
-	return nil
+	return os.RemoveAll(path)
 }

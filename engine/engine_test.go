@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -332,4 +333,21 @@ func TestEngine_Run(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEngine_DeleteCode(t *testing.T) {
+	os.Mkdir("temp", 0777)
+	eg := New("temp", "main")
+
+	eg.DeleteCode(&lib.Code{
+		Path:     "temp",
+		Language: lang.Go,
+	})
+
+	_, err := ioutil.ReadDir("temp")
+
+	if err == nil {
+		t.Errorf("Expected nil but got %v", err)
+	}
+
 }
