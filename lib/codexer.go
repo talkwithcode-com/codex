@@ -20,7 +20,7 @@ type Output struct {
 
 // Codexer ...
 type Codexer interface {
-	Run(ctx context.Context, code *Code, input []byte) (Output, error)
+	Run(ctx context.Context, code *Code, input []byte) (*Output, error)
 	WriteCode(language lang.Language, sourceCode string) (*Code, error)
 	DeleteCode(code *Code)
 }
