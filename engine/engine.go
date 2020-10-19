@@ -1,7 +1,10 @@
 package engine
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"io"
 
 	"github.com/talkwithcode-com/codex/lib"
 	"github.com/talkwithcode-com/codex/lib/lang"
@@ -16,6 +19,15 @@ type Engine struct {
 	filename string
 }
 
+// New create new engine
+func New(tempDir, filename string) *Engine {
+	return &Engine{
+		tempDir:  tempDir,
+		filename: filename,
+		fm:       new(FileManger),
+	}
+}
+
 // Run code and return the outputs.
 func (e *Engine) Run(ctx context.Context, code *lib.Code, input []byte) (lib.Output, error) {
 
@@ -25,7 +37,26 @@ func (e *Engine) Run(ctx context.Context, code *lib.Code, input []byte) (lib.Out
 
 // WriteCode into file system.
 func (e *Engine) WriteCode(language lang.Language, sourceCode string) (*lib.Code, error) {
-	return nil, nil
+	config := lang.LanguageConfig[language]
+
+	filePath := fmt.Sprintf("%s/%s.%s", e.tempDir, e.filename, config.Extension)
+
+	file, err := e.fm.Create(filePath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	reader := bytes.NewReader([]byte(sourceCode))
+	io.Copy(file, reader)
+
+	code := &lib.Code{
+		Language: language,
+		Path:     filePath,
+	}
+
+	return code, nil
+
 }
 
 // DeleteCode from file system.
