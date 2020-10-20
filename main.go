@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"os"
 
@@ -11,7 +12,7 @@ import (
 var port = os.Getenv("CODEX_PORT")
 
 func main() {
-	eg := new(engine.Engine)
+	eg := engine.New(os.TempDir(), "main")
 	cs := server.New(eg)
-	http.ListenAndServe(":"+port, cs)
+	log.Fatal(http.ListenAndServe(":"+port, cs))
 }
