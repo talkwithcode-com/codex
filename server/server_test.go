@@ -37,12 +37,19 @@ func (me *mockEngine) DeleteCode(code *lib.Code) {
 func TestCodexServer_handleRun(t *testing.T) {
 
 	data := map[string]interface{}{
-		"source_code": `
-			console.log("hello")
-			console.error("myerror")
-		`,
-		"language": "js",
-		"inputs":   []string{""},
+		"source_code": "const readline = require(\"readline\")\r\n\r\nconst r = readline.createInterface({\r\n  input: process.stdin,\r\n  output: process.stdout,\r\n})\r\n\r\nr.on(\"line\", (input) => {\r\n  const N = parseInt(input)\r\n  console.log(N * 2)\r\n  r.close()\r\n})\r\n\r\nconsole.error(\"MyError\")",
+		"language":    "js",
+		"test_cases": []map[string]string{
+			{
+				"id":     "1",
+				"input":  "10",
+				"output": "20",
+			}, {
+				"id":     "2",
+				"input":  "5",
+				"output": "23",
+			},
+		},
 	}
 
 	b, err := json.Marshal(data)
@@ -70,15 +77,37 @@ func TestCodexServer_handleRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not read response: %v", err)
 	}
-	var r Result
+	var r ResponseBody
 	json.Unmarshal(b, &r)
 
-	if r.Outputs[0].Stdout != "hello\n" {
-		t.Errorf("Expect %s; got %s", r.Outputs[0].Stdout, "hello\n")
+	expect := []Log{
+		{
+			ID:     "1",
+			Status: "success",
+			Stderr: "MyError",
+			Stdint: "10",
+			Stdout: "20",
+		}, {
+			ID:     "2",
+			Status: "fail",
+			Stderr: "MyError",
+			Stdint: "5",
+			Stdout: "10",
+		},
 	}
 
-	if r.Outputs[0].Stderr != "myerror\n" {
-		t.Errorf("Expect %s; got %s", r.Outputs[0].Stderr, "myerror")
+	for i, tc := range expect {
+		if r.Logs[i].Stdout != tc.Stdout {
+			t.Errorf("Expected %v; got %v", tc.Stdout, r.Logs[i].Stdout)
+		}
+		if r.Logs[i].Stderr != tc.Stderr {
+			t.Errorf("Expected %v; got %v", tc.Stderr, r.Logs[i].Stderr)
+		}
+
+		if r.Logs[i].Status != tc.Status {
+			t.Errorf("Expected %v; got %v", tc.Status, r.Logs[i].Status)
+		}
+
 	}
 
 }
@@ -86,12 +115,9 @@ func TestCodexServer_handleRun(t *testing.T) {
 func TestCodexServer_handleRun_BadRequest(t *testing.T) {
 
 	data := map[string]interface{}{
-		"source_code": `
-			console.log("hello")
-			console.error("myerror")
-		`,
-		"language": "js",
-		"inputs":   "",
+		"source_code": 1,
+		"language":    "js",
+		"test_cases":  nil,
 	}
 
 	b, err := json.Marshal(data)
@@ -100,7 +126,6 @@ func TestCodexServer_handleRun_BadRequest(t *testing.T) {
 	}
 
 	req, err := http.NewRequest(http.MethodPost, baseURL, bytes.NewReader(b))
-
 	if err != nil {
 		t.Fatalf("could not create request: %v", err)
 	}
@@ -124,12 +149,9 @@ func TestCodexServer_handleRun_BadRequest(t *testing.T) {
 func TestCodexServer_handleRun_InternalServerError(t *testing.T) {
 
 	data := map[string]interface{}{
-		"source_code": `
-			console.log("hello")
-			console.error("myerror")
-		`,
-		"language": "js",
-		"inputs":   []string{""},
+		"source_code": "",
+		"language":    "js",
+		"test_cases":  nil,
 	}
 
 	b, err := json.Marshal(data)
@@ -165,12 +187,9 @@ func TestRouting_Ok(t *testing.T) {
 	defer srv.Close()
 
 	data := map[string]interface{}{
-		"source_code": `
-			console.log("hello")
-			console.error("myerror")
-		`,
-		"language": "js",
-		"inputs":   []string{""},
+		"source_code": "",
+		"language":    "js",
+		"test_cases":  nil,
 	}
 
 	b, err := json.Marshal(data)
@@ -196,12 +215,9 @@ func TestRouting_NotFound(t *testing.T) {
 	defer srv.Close()
 
 	data := map[string]interface{}{
-		"source_code": `
-			console.log("hello")
-			console.error("myerror")
-		`,
-		"language": "js",
-		"inputs":   []string{""},
+		"source_code": "",
+		"language":    "js",
+		"test_cases":  nil,
 	}
 
 	b, err := json.Marshal(data)

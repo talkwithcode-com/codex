@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/talkwithcode-com/codex/lib"
 	"github.com/talkwithcode-com/codex/lib/lang"
@@ -25,11 +26,26 @@ type Submission struct {
 	SourceCode string   `json:"source_code"`
 	Language   string   `json:"language"`
 	Inputs     []string `json:"inputs"`
+	TestCases  []struct {
+		ID     string `json:"id"`
+		Input  string `json:"input"`
+		Output string `json:"output"`
+	} `json:"test_cases"`
 }
 
-// Result ...
-type Result struct {
-	Outputs []lib.Output `json:"outputs"`
+// ResponseBody ...
+type ResponseBody struct {
+	Language string `json:"language"`
+	Logs     []Log  `json:"logs"`
+}
+
+// Log ...
+type Log struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	Stderr string `json:"stderr"`
+	Stdout string `json:"stdout"`
+	Stdint string `json:"stdin"`
 }
 
 // New create CodexServer instance
@@ -60,7 +76,7 @@ func (cs *CodexServer) handleRun(rw http.ResponseWriter, r *http.Request) {
 
 	var s Submission
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-		http.Error(rw, "Bad Request", http.StatusBadRequest)
+		http.Error(rw, "Bad Request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -69,22 +85,39 @@ func (cs *CodexServer) handleRun(rw http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	result := new(Result)
+	var rb ResponseBody
 
-	for _, input := range s.Inputs {
-		out, err := cs.engine.Run(context.Background(), code, []byte(input))
-		if err == nil {
-			result.Outputs = append(result.Outputs, *out)
+	rb.Language = s.Language
+
+	for _, test := range s.TestCases {
+		out, err := cs.engine.Run(context.Background(), code, []byte(test.Input))
+		l := Log{
+			ID:     test.ID,
+			Stdint: test.Input,
 		}
 
+		if err == nil {
+			l.Stderr = strings.TrimSuffix(out.Stderr, "\n")
+			l.Stdout = strings.TrimSuffix(out.Stdout, "\n")
+		}
+
+		l.Status = "fail"
+		if l.Stdout == test.Output {
+			l.Status = "success"
+		}
+
+		rb.Logs = append(rb.Logs, l)
 	}
 
-	b, err := json.Marshal(result)
+	b, err := json.Marshal(rb)
 
 	if err != nil {
 		log.Fatal(err)
 	}
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
 	rw.Write(b)
 }
